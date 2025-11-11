@@ -394,9 +394,23 @@ const filterRoute = async (originCoordinates, destinationCoordinates) => {
   const originPopudensity = await getPopudensity(originLat, originLng);
   const destPopudensity = await getPopudensity(destLat, destLng);
 
+  // Fetch placeholder data for crime rate and road condition
+  const originCrimeRate = getCrimeRate(originCoordinates);
+  const destCrimeRate = getCrimeRate(destinationCoordinates);
+  const originRoadCondition = getRoadCondition(originCoordinates);
+  const destRoadCondition = getRoadCondition(destinationCoordinates);
+
   // Calculate safety scores for origin and destination
-  const originScore = calculateScore(originPopudensity);
-  const destScore = calculateScore(destPopudensity);
+  const originScore = calculateScore({
+    popudensity: originPopudensity,
+    crimeRate: originCrimeRate,
+    roadCondition: originRoadCondition,
+  });
+  const destScore = calculateScore({
+    popudensity: destPopudensity,
+    crimeRate: destCrimeRate,
+    roadCondition: destRoadCondition,
+  });
 
   const averageScore = (originScore + destScore) / 2;
 
@@ -412,7 +426,12 @@ const filterRoute = async (originCoordinates, destinationCoordinates) => {
   return safeRoute.length ? safeRoute : null;
 };
 
-const getCrimeRate = (coordinates) => {};
+// Placeholder for fetching crime rate data
+const getCrimeRate = (coordinates) => {
+  // This function would fetch crime rate data from a reliable API.
+  // Since no free and reliable API was found, this is a placeholder.
+  return 0; // Default value
+};
 
 const getPopudensity = async (latitude, longitude) => {
   try {
@@ -432,9 +451,18 @@ const getPopudensity = async (latitude, longitude) => {
       }
     );
 
-    const populationData = response.data.elements[0]?.tags?.population;
-    console.log("Population density :", populationData);
-    return populationData || 0; // Return population or a default value
+    const elements = response.data?.elements;
+
+    if (elements && elements.length > 0) {
+      const populationData = elements[0]?.tags?.population;
+      if (populationData) {
+        console.log("Population density:", populationData);
+        return parseInt(populationData, 10) || 0;
+      }
+    }
+
+    console.log("No population data found for the given coordinates.");
+    return 0; // No data found or population tag is missing
   } catch (error) {
     console.error(
       "Error fetching population density from Overpass API:",
@@ -444,16 +472,43 @@ const getPopudensity = async (latitude, longitude) => {
   }
 };
 
-const getRoadCondition = (coordinates) => {};
+// Placeholder for fetching road condition data
+const getRoadCondition = (coordinates) => {
+  // This function would fetch road condition data from a reliable API.
+  // Since no free and reliable API was found, this is a placeholder.
+  return 0; // Default value
+};
 
-const calculateScore = (popudensity) => {
+const calculateScore = (factors) => {
+  const { popudensity, crimeRate, roadCondition } = factors;
   let score = 0;
-  if (popudensity <= 1000) {
-    score += 30;
-  } else if (popudensity > 1000 && popudensity < 5000) {
-    score += 20;
-  } else {
-    score += 20;
+
+  // Define scoring rules for population density
+  const popudensityRules = [
+    { max: 1000, points: 30 },
+    { max: 5000, points: 20 },
+    { min: 5000, points: 10 },
+  ];
+
+  // Apply population density rules
+  for (const rule of popudensityRules) {
+    if (
+      (rule.max && popudensity <= rule.max) ||
+      (rule.min && popudensity > rule.min)
+    ) {
+      score += rule.points;
+      break;
+    }
+  }
+
+  // Add scoring for crime rate (placeholder)
+  if (crimeRate === 0) {
+    score += 10; // Bonus for no crime
+  }
+
+  // Add scoring for road condition (placeholder)
+  if (roadCondition === 0) {
+    score += 10; // Bonus for good roads
   }
 
   return Math.min(Math.max(score, 0), 100);
@@ -672,5 +727,7 @@ const getRouteWalk = async (req, res) => {
 
 // Define the route
 SafeRouter.post("/carRoute", getRouteCar);
+SafeRouter.post("/bikeRoute", getRouteBike);
+SafeRouter.post("/walkRoute", getRouteWalk);
 
 export default SafeRouter;
